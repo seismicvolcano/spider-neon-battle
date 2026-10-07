@@ -1,11 +1,15 @@
-import { GAMEPLAY, COLORS } from './config.js';
+import { GAMEPLAY, COLORS, COMBAT } from './config.js';
 import { raycast } from './raycast.js';
 
 export default class Spider {
-  constructor(scene) {
+  constructor(scene, { id, spawn, color, accentColor }) {
     this.scene = scene;
-    this.body = scene.matter.add.circle(GAMEPLAY.spawn.x, GAMEPLAY.spawn.y, GAMEPLAY.radius, {
-      label: 'spider', friction: 0, frictionStatic: 0, frictionAir: GAMEPLAY.airDrag,
+    this.id = id; this.spawn = { ...spawn }; this.color = color; this.accentColor = accentColor;
+    this.hearts = COMBAT.hearts; this.score = 0; this.dead = false;
+    this.invulnerableUntil = 0; this.respawnAt = 0; this.weapon = null;
+    this.aim = { x: 0.6, y: -0.8 }; this.webHeld = false; this.trail = [];
+    this.body = scene.matter.add.circle(spawn.x, spawn.y, GAMEPLAY.radius, {
+      label: `spider-${id}`, friction: 0, frictionStatic: 0, frictionAir: GAMEPLAY.airDrag,
       restitution: 0, density: 0.003,
     });
     scene.matter.body.setInertia(this.body, Infinity);
@@ -20,6 +24,18 @@ export default class Spider {
   }
 
   queueJump(time) { this.jumpQueuedUntil = time + GAMEPLAY.jumpBufferMs; }
+
+  act(time, action) {
+    this.aim = { x: action.aimX, y: action.aimY };
+    if (this.dead) return;
+    if (action.jumpPressed) this.queueJump(time);
+    if (action.webHeld && !this.webHeld) this.web.attach(this.aim);
+    if (!action.webHeld && this.webHeld) this.web.release();
+    this.webHeld = action.webHeld;
+    this.step(time, action.moveX, this.web);
+    this.web.beforeStep();
+    if (action.attackHeld) this.scene.combat.attack(this, time);
+  }
 
   checkGround() {
     if (this.body.velocity.y < -2) return false;
@@ -62,7 +78,7 @@ export default class Spider {
       this.jumpQueuedUntil = -Infinity;
       this.lastGrounded = -Infinity;
       this.grounded = false;
-      this.scene.pulse(this.body.position.x, this.body.position.y + 17, COLORS.cyan);
+      this.scene.pulse(this.body.position.x, this.body.position.y + 17, this.color);
     }
     const speed = Math.hypot(this.body.velocity.x, this.body.velocity.y);
     if (speed > GAMEPLAY.maxSwingSpeed) {
@@ -80,20 +96,26 @@ export default class Spider {
   accelerate(direction, acceleration, limit) {
     if (!direction) return;
     const v = this.body.velocity;
-    if (v.x * direction < limit) {
+    // Input magnitude must not truncate momentum above the run-speed cap.
+    if (v.x * Math.sign(direction) < limit) {
       const next = v.x + direction * acceleration;
       this.scene.matter.body.setVelocity(this.body, { x: direction > 0 ? Math.min(next, limit) : Math.max(next, -limit), y: v.y });
     }
   }
 
-  reset(web) {
-    web.release();
-    this.scene.matter.body.setPosition(this.body, GAMEPLAY.spawn);
+  reset(time = 0) {
+    this.web.release();
+    this.webHeld = false; this.dead = false; this.body.isSensor = false;
+    this.hearts = COMBAT.hearts; this.weapon = null;
+    this.invulnerableUntil = time + COMBAT.spawnInvulnerabilityMs;
+    this.scene.matter.body.setStatic(this.body, false);
+    this.scene.matter.body.setInertia(this.body, Infinity);
+    this.scene.matter.body.setPosition(this.body, this.spawn);
     this.scene.matter.body.setVelocity(this.body, { x: 0, y: 0 });
     this.body.force.x = this.body.force.y = 0;
     this.lastGrounded = this.jumpQueuedUntil = -Infinity;
     this.riverCooldown = 0;
-    this.scene.trail.length = 0;
+    this.grounded = false; this.trail.length = 0;
   }
 
   draw(delta) {
@@ -103,6 +125,8 @@ export default class Spider {
     this.gait += Math.abs(this.body.velocity.x) * delta * 0.008;
     const g = this.graphics;
     g.clear().setPosition(p.x, p.y);
+    if (this.dead) return;
+    g.setAlpha(this.scene.simTime < this.invulnerableUntil && Math.floor(this.scene.simTime / 90) % 2 ? 0.3 : 1);
     g.rotation = Math.max(-0.3, Math.min(0.3, this.body.velocity.x * 0.018));
     for (const side of [-1, 1]) {
       for (let leg = 0; leg < 4; leg++) {
@@ -113,17 +137,17 @@ export default class Spider {
           { x: side * (32 + walk), y: y + lift }];
         g.lineStyle(5, 0x080d19).strokePoints(points);
         g.lineStyle(2, 0x597284).strokePoints(points);
-        g.fillStyle(COLORS.cyan, 0.9).fillCircle(points[1].x, points[1].y, 1.6);
+        g.fillStyle(this.color, 0.9).fillCircle(points[1].x, points[1].y, 1.6);
       }
     }
-    g.fillStyle(COLORS.cyan, 0.055).fillEllipse(0, 1, 53, 61);
+    g.fillStyle(this.color, 0.055).fillEllipse(0, 1, 53, 61);
     g.fillStyle(0x080f1c).fillEllipse(0, 5, 28, 32);
     g.lineStyle(1.5, 0x426b7a).strokeEllipse(0, 5, 28, 32);
     g.fillStyle(0x142c3a).fillEllipse(-3, 1, 11, 20);
-    g.lineStyle(2, COLORS.cyan, 0.8).lineBetween(-5, 9, 0, 13).lineBetween(0, 13, 5, 9);
+    g.lineStyle(2, this.color, 0.8).lineBetween(-5, 9, 0, 13).lineBetween(0, 13, 5, 9);
     g.fillStyle(0x101a28).fillEllipse(0, -12, 23, 20);
     g.lineStyle(1, 0x4d8794).strokeEllipse(0, -12, 23, 20);
-    g.fillStyle(COLORS.cyan, 0.18).fillCircle(-5, -16, 6).fillCircle(5, -16, 6);
-    g.fillStyle(0xadfff2).fillCircle(-5, -16, 2.8).fillCircle(5, -16, 2.8);
+    g.fillStyle(this.color, 0.18).fillCircle(-5, -16, 6).fillCircle(5, -16, 6);
+    g.fillStyle(this.accentColor).fillCircle(-5, -16, 2.8).fillCircle(5, -16, 2.8);
   }
 }
