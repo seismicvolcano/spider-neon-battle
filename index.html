@@ -1,0 +1,27 @@
+<!doctype html>
+<html lang="es">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <meta name="theme-color" content="#070b17" />
+    <title>Spider Neon Battle · Movement Prototype</title>
+  </head>
+  <body>
+    <main id="game" aria-label="Spider Neon Battle: prototipo de movimiento"></main>
+    <div class="hud">
+      <header>
+        <div class="eyebrow"><span></span> LOCOMOTION LAB <b>01</b></div>
+        <h1>SPIDER <strong>NEON</strong> BATTLE</h1>
+        <p>Prototype V0.1 <span>/</span> Caverna Neón</p>
+      </header>
+      <aside class="status"><span id="web-led"></span><b id="web-status">WEB: READY</b><small id="web-detail">AIM AT A SOLID SURFACE</small></aside>
+      <footer>
+        <div class="controls"><span><kbd>A</kbd><kbd>D</kbd> Move</span><span><kbd>W</kbd><i>/</i><kbd>SPACE</kbd> Jump</span><span><kbd class="mouse">RMB</kbd> Hold to web <i>·</i> Release to let go</span></div>
+        <div class="utilities"><span><kbd>R</kbd> Reset</span><span><kbd>F1</kbd> Debug</span></div>
+      </footer>
+      <div class="corner-note">EXPERIMENTAL PHYSICS <span>●</span> NO FALL DAMAGE</div>
+      <pre id="debug-info" hidden></pre>
+    </div>
+    <script type="module" src="/src/main.js"></script>
+  </body>
+</html>

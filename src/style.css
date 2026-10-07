@@ -1,0 +1,28 @@
+* { box-sizing: border-box; }
+html, body { margin: 0; width: 100%; height: 100%; overflow: hidden; background: #070b17; }
+body { font-family: 'Segoe UI', Arial, sans-serif; color: #d3e2ee; }
+#game { width: 100%; height: 100%; }
+canvas { display: block; cursor: crosshair; }
+.hud { position: fixed; inset: 0; pointer-events: none; }
+header { position: absolute; top: 30px; left: 34px; padding: 8px 48px 18px 0; background: linear-gradient(90deg, #070b17dd, transparent); }
+.eyebrow { color: #6e879c; font-size: 10px; letter-spacing: 3px; display: flex; align-items: center; gap: 10px; }
+.eyebrow span, .status > span { width: 6px; height: 6px; background: #53eee3; display: inline-block; box-shadow: 0 0 12px #53eee366; }
+.eyebrow b { border: 1px solid #30434f; font-weight: 400; padding: 2px 6px; margin-left: 4px; }
+h1 { font-size: 22px; font-weight: 600; letter-spacing: 2px; margin: 12px 0 6px; }
+h1 strong { color: #58e8e2; font-weight: 600; }
+header p { font-size: 11px; letter-spacing: 1px; color: #76889d; margin: 0; }
+header p span { padding: 0 8px; color: #394657; }
+.status { position: absolute; right: 34px; top: 42px; display: grid; grid-template-columns: 7px auto; column-gap: 12px; row-gap: 7px; padding: 14px 18px; border: 1px solid #26434a; background: #080f1cd9; }
+.status > span { margin-top: 4px; border-radius: 50%; }
+.status b { font: 11px Consolas, monospace; letter-spacing: 2px; color: #77e2db; }
+.status small { grid-column: 2; font-size: 8px; letter-spacing: 1.5px; color: #698295; }
+footer { position: absolute; bottom: 35px; left: 34px; right: 34px; display: flex; align-items: center; justify-content: space-between; gap: 15px; }
+.controls, .utilities { display: flex; gap: 24px; align-items: center; background: #080e19db; border-top: 1px solid #253444; padding: 14px 17px; font-size: 11px; color: #9eafc1; }
+.controls span, .utilities span { display: flex; gap: 6px; align-items: center; }
+kbd { display: inline-flex; justify-content: center; align-items: center; min-width: 23px; height: 24px; border: 1px solid #354454; border-bottom: 2px solid #45576b; border-radius: 3px; font: 10px Consolas, monospace; color: #dbebf1; padding: 0 6px; background: #142030; }
+i { font-style: normal; color: #4a6175; margin: 0 3px; }
+.corner-note { position: absolute; bottom: 13px; left: 51px; font-size: 8px; letter-spacing: 1.8px; color: #486172; }
+.corner-note span { color: #529b91; margin: 0 9px; }
+#debug-info { position: absolute; top: 142px; left: 34px; color: #94e9b4; background: #070b17d9; padding: 12px; font-size: 11px; }
+@media (max-width: 850px) { header { top: 16px; left: 18px; } h1 { font-size: 17px; } .status { right: 18px; top: 25px; } footer { bottom: 28px; left: 18px; right: 18px; } .controls, .utilities { gap: 10px; padding: 10px; font-size: 9px; } .corner-note { left: 28px; font-size: 7px; } }
+@media (max-width: 650px) { .status { left: 18px; right: auto; top: 116px; padding: 10px 12px; } footer { flex-wrap: wrap; gap: 6px; } .controls { flex-wrap: wrap; width: 100%; } .utilities { padding: 5px 10px; } .corner-note { font-size: 6px; letter-spacing: 1px; } }
