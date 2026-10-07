@@ -108,7 +108,7 @@ export default class CombatSystem {
   }
   drawWeapon(g, type, x, y, angle, color, alpha = 1) {
     const dx = Math.cos(angle), dy = Math.sin(angle);
-    const end = type === 'sword' ? 47 : 22;
+    const end = type === 'sword' ? COMBAT.sword.reach - 20 : 22;
     g.lineStyle(type === 'sword' ? 11 : 9, 0x09101d, alpha)
       .lineBetween(x - dx * 7, y - dy * 7, x + dx * 9, y + dy * 9);
     g.lineStyle(type === 'sword' ? 12 : 10, color, 0.1 * alpha)

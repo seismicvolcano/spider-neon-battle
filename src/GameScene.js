@@ -226,7 +226,7 @@ export default class GameScene extends Phaser.Scene {
     else if (action.resetPressed) this.restartMatch();
     else if (!this.winner && action.pausePressed) {
       this.paused = !this.paused; this.accumulator = 0;
-      if (this.paused) { this.controls.clear(); this.tweens.pauseAll(); }
+      if (this.paused) { this.controls.clear(false); this.tweens.pauseAll(); }
       else this.tweens.resumeAll();
     }
     // Bound catch-up after tab suspension; Matter always receives a fixed delta.

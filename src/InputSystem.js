@@ -13,6 +13,7 @@ export default class InputSystem {
     this.pending = neutralAction(this.aim);
     this.status = 'PRESS ANY BUTTON · KEYBOARD READY';
     this.source = 'keyboard';
+    this.disconnected = false;
     this.override = null;
     for (const key of [this.keys.W, this.keys.SPACE]) key.on('down', (event) => {
       if (!event.repeat) this.keyboardJump = true;
@@ -34,14 +35,14 @@ export default class InputSystem {
     scene.events.once('shutdown', () => window.removeEventListener('blur', this.onBlur));
   }
 
-  clear() {
+  clear(resetGamepad = true) {
     Object.values(this.keys).forEach((key) => key.reset());
     this.keyboardJump = this.keyboardPause = this.keyboardReset = false;
     this.mouseWeb = this.mouseAttack = false;
-    this.gamepad.reset(); this.pending = neutralAction(this.aim);
-    for (const spider of this.scene.spiders) {
-      spider.web.release(); spider.jumpQueuedUntil = -Infinity;
-    }
+    if (resetGamepad) this.gamepad.reset();
+    this.pending = neutralAction(this.aim);
+    this.scene.spider.web.release();
+    this.scene.spider.jumpQueuedUntil = -Infinity;
   }
 
   poll() {
@@ -49,7 +50,8 @@ export default class InputSystem {
     const pad = Array.from(pads).find((p) => p?.connected && p.mapping === 'standard');
     const source = this.override ? 'simulation' : pad ? 'gamepad' : 'keyboard';
     if (source !== this.source) {
-      this.clear(); this.scene.spider.web.release(); this.source = source;
+      this.disconnected = this.source === 'gamepad' && source === 'keyboard';
+      this.clear(); this.source = source;
     }
     let action;
     if (this.override) {
@@ -67,7 +69,8 @@ export default class InputSystem {
         jumpPressed: this.keyboardJump, pausePressed: this.keyboardPause,
         resetPressed: this.keyboardReset, webHeld: this.mouseWeb, attackHeld: this.mouseAttack };
       this.status = Array.from(pads).some((p) => p?.connected)
-        ? 'NON-STANDARD PAD · KEYBOARD READY' : 'PRESS ANY BUTTON · KEYBOARD READY';
+        ? 'NON-STANDARD PAD · KEYBOARD READY' : this.disconnected
+          ? 'GAMEPAD DISCONNECTED · KEYBOARD READY' : 'PRESS ANY BUTTON · KEYBOARD READY';
     }
     this.keyboardJump = this.keyboardPause = this.keyboardReset = false;
     this.aim = { x: action.aimX, y: action.aimY };

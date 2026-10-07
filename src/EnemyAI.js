@@ -24,6 +24,17 @@ export default class EnemyAI {
           .sort((a, b) => Math.hypot(a.x - p.x, a.y - p.y) - Math.hypot(b.x - p.x, b.y - p.y));
         if (pickups[0]) this.goal = { x: pickups[0].x, y: pickups[0].y };
       }
+      // If a shelf is above us, first go around its edge. A local horizontal
+      // probe avoids choosing an edge blocked by another wall or the cavern rim.
+      const blocker = this.goal.y < p.y - AI.higherTarget && raycast(this.scene.solids, p, this.goal);
+      if (blocker && blocker.normal.y > 0.45) {
+        const bounds = blocker.body.bounds;
+        const left = bounds.min.x - AI.edgeClearance;
+        const right = bounds.max.x + AI.edgeClearance;
+        const leftBlocked = raycast(this.scene.solids, p, { x: left, y: p.y });
+        const rightBlocked = raycast(this.scene.solids, p, { x: right, y: p.y });
+        this.goal.x = !leftBlocked && (rightBlocked || Math.abs(p.x - left) < Math.abs(p.x - right)) ? left : right;
+      }
       const error = (Math.random() * 2 - 1) * AI.aimErrorRad;
       const angle = Math.atan2(target.y - p.y, target.x - p.x) + error;
       this.aim = { x: Math.cos(angle), y: Math.sin(angle) };
@@ -33,10 +44,15 @@ export default class EnemyAI {
       ? Math.sign(dx) * AI.moveStrength : 0;
     const obstacle = raycast(this.scene.solids, { x: p.x, y: p.y + 4 },
       { x: p.x + Math.sign(dx) * AI.obstacleProbe, y: p.y + 4 });
-    if (spider.grounded && time >= this.nextJump && (this.goal.y < p.y - AI.higherTarget || obstacle)) {
+    const aheadX = p.x + Math.sign(dx) * AI.obstacleProbe;
+    const groundAhead = raycast(this.scene.solids, { x: aheadX, y: p.y },
+      { x: aheadX, y: p.y + AI.ledgeProbeDepth });
+    const ledge = action.moveX && !groundAhead;
+    if (spider.grounded && time >= this.nextJump && (this.goal.y < p.y - AI.higherTarget || obstacle || ledge)) {
       action.jumpPressed = true; this.nextJump = time + AI.jumpCooldownMs;
     }
-    if (time >= this.nextWeb && !spider.grounded && Math.abs(dx) > AI.stopDistance * 3) {
+    if (time >= this.nextWeb && !spider.grounded &&
+      (Math.abs(dx) > AI.stopDistance * 3 || this.goal.y < p.y - AI.higherTarget)) {
       this.nextWeb = time + AI.webIntervalMs;
       const webAim = aimDirection(Math.sign(dx) * 0.6, -1);
       if (spider.web.target(webAim).hit) {

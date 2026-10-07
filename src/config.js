@@ -61,6 +61,7 @@ export const CAMERA = { minZoom: 0.48, maxZoom: 1.15, paddingX: 360, paddingY: 4
 export const AI = {
   reactionMs: 280, aimErrorRad: 0.12, moveStrength: 0.85, stopDistance: 65,
   jumpCooldownMs: 850, higherTarget: 65, obstacleProbe: 62,
+  ledgeProbeDepth: 90, edgeClearance: 85,
   attackRange: 720, webIntervalMs: 2200, webHoldMs: 800,
   swordRange: 105, pistolFireMs: 720,
 };
