@@ -7,6 +7,7 @@ const game = new Phaser.Game({
   parent: 'game',
   backgroundColor: '#070b17',
   antialias: true,
+  input: { gamepad: true },
   scale: { mode: Phaser.Scale.RESIZE, width: window.innerWidth, height: window.innerHeight },
   physics: {
     default: 'matter',
@@ -16,7 +17,7 @@ const game = new Phaser.Game({
   scene: [GameScene],
   callbacks: { postBoot: (game) => {
     game.canvas.setAttribute('tabindex', '0');
-    game.canvas.setAttribute('aria-label', 'Caverna Neón. A/D mover, W o Space saltar, botón derecho telaraña.');
+    game.canvas.setAttribute('aria-label', 'Spider Neon Battle. LS mover, RS apuntar, A saltar, LT telaraña, RT atacar.');
   } },
 });
 

@@ -1,14 +1,16 @@
 import Phaser from 'phaser';
 import Spider from './Spider.js';
 import WebSystem from './WebSystem.js';
-import { GAMEPLAY, COLORS } from './config.js';
+import InputSystem from './InputSystem.js';
+import CombatSystem from './CombatSystem.js';
+import EnemyAI from './EnemyAI.js';
+import { GAMEPLAY, COLORS, FIGHTERS, CAMERA, COMBAT } from './config.js';
 
 export default class GameScene extends Phaser.Scene {
   constructor() { super('cavern'); }
 
   create() {
     this.solids = [];
-    this.trail = [];
     this.accumulator = 0;
     this.simTime = 0;
     this.debug = false;
@@ -19,14 +21,16 @@ export default class GameScene extends Phaser.Scene {
     this.buildArena();
     this.effects = this.add.graphics().setDepth(6);
     this.debugGraphics = this.add.graphics().setDepth(20);
-    this.spider = new Spider(this);
-    this.web = new WebSystem(this, this.spider);
-    this.keys = this.input.keyboard.addKeys('A,D,W,SPACE,R,F1');
-    this.input.keyboard.addCapture(['SPACE', 'F1']);
-    for (const key of [this.keys.W, this.keys.SPACE]) {
-      key.on('down', (event) => { if (!event.repeat) this.spider.queueJump(this.simTime); });
-    }
-    this.keys.R.on('down', () => this.spider.reset(this.web));
+    this.spider = new Spider(this, FIGHTERS.player);
+    this.enemy = new Spider(this, FIGHTERS.enemy);
+    this.spiders = [this.spider, this.enemy];
+    for (const spider of this.spiders) spider.web = new WebSystem(this, spider);
+    this.web = this.spider.web;
+    this.combat = new CombatSystem(this);
+    this.controls = new InputSystem(this);
+    this.ai = new EnemyAI(this, this.enemy, this.spider);
+    this.keys = this.controls.keys;
+    this.paused = false; this.winner = null;
     this.keys.F1.on('down', (event) => {
       if (event.repeat) return;
       this.debug = !this.debug;
@@ -34,7 +38,7 @@ export default class GameScene extends Phaser.Scene {
     });
     const camera = this.cameras.main;
     camera.setBounds(0, 0, GAMEPLAY.worldWidth, GAMEPLAY.worldHeight);
-    this.cameraTarget = { x: GAMEPLAY.spawn.x, y: GAMEPLAY.spawn.y - 80 };
+    this.cameraTarget = { x: (this.spider.x + this.enemy.x) / 2, y: this.spider.y - CAMERA.verticalOffset };
     camera.startFollow(this.cameraTarget, false, GAMEPLAY.cameraLerp, GAMEPLAY.cameraLerp);
     camera.centerOn(this.cameraTarget.x, this.cameraTarget.y);
     this.scale.on('resize', this.fitView, this);
@@ -47,14 +51,46 @@ export default class GameScene extends Phaser.Scene {
   }
 
   onBlur() {
-    this.keys.A.reset();
-    this.keys.D.reset();
-    this.spider.jumpQueuedUntil = -Infinity;
+    this.controls.clear();
+    if (!this.winner) { this.paused = true; this.tweens.pauseAll(); }
     this.accumulator = 0;
   }
 
   fitView() {
-    this.cameras.main.setZoom(Phaser.Math.Clamp(this.scale.width / 1440, 0.65, 1.15));
+    this.baseZoom = Phaser.Math.Clamp(this.scale.width / 1440, 0.65, CAMERA.maxZoom);
+    this.cameras.main.setZoom(this.baseZoom);
+  }
+
+  finishMatch(winner) {
+    this.winner = winner;
+    for (const spider of this.spiders) { spider.web.release(); spider.webHeld = false; }
+    this.accumulator = 0;
+  }
+
+  restartMatch() {
+    this.winner = null; this.paused = false; this.simTime = 0; this.accumulator = 0;
+    this.combat.reset();
+    for (const spider of this.spiders) { spider.score = 0; spider.reset(0); }
+    this.ai.reset(); this.tweens.resumeAll();
+  }
+
+  updateHud() {
+    const hearts = (s) => '♥'.repeat(s.hearts) + '♡'.repeat(COMBAT.hearts - s.hearts);
+    const weapon = (s) => s.dead ? 'RESPAWNING…' : !s.weapon ? 'FIND A WEAPON' :
+      s.weapon.type === 'pistol' ? `LASER PISTOL · ${s.weapon.ammo}/${COMBAT.pistol.ammo}` : 'LASER SWORD';
+    document.getElementById('cyan-hearts').textContent = hearts(this.spider);
+    document.getElementById('magenta-hearts').textContent = hearts(this.enemy);
+    document.getElementById('cyan-weapon').textContent = weapon(this.spider);
+    document.getElementById('magenta-weapon').textContent = weapon(this.enemy);
+    document.getElementById('score').textContent = `${this.spider.score} — ${this.enemy.score}`;
+    document.getElementById('pad-status').textContent = this.controls.status;
+    document.getElementById('web-status').textContent = this.web.attached ? 'WEB: ATTACHED' :
+      this.simTime < this.web.missedUntil ? 'WEB: OUT OF REACH' : 'WEB: READY';
+    document.getElementById('web-detail').textContent = this.web.attached ? 'RELEASE LT TO FLY' : 'AIM AT A SOLID SURFACE';
+    const overlay = document.getElementById('match-overlay');
+    overlay.hidden = !this.winner && !this.paused;
+    document.getElementById('match-title').textContent = this.winner ? `${this.winner.id.toUpperCase()} WINS` : 'PAUSED';
+    document.getElementById('match-hint').textContent = this.winner ? 'A / SPACE · PLAY AGAIN' : 'MENU / ESC · RESUME';
   }
 
   background() {
@@ -184,27 +220,45 @@ export default class GameScene extends Phaser.Scene {
   }
 
   update(time, delta) {
+    this.controls.poll();
+    const action = this.controls.consume();
+    if (this.winner && (action.jumpPressed || action.resetPressed)) this.restartMatch();
+    else if (action.resetPressed) this.restartMatch();
+    else if (!this.winner && action.pausePressed) {
+      this.paused = !this.paused; this.accumulator = 0;
+      if (this.paused) { this.controls.clear(false); this.tweens.pauseAll(); }
+      else this.tweens.resumeAll();
+    }
     // Bound catch-up after tab suspension; Matter always receives a fixed delta.
-    this.accumulator += Math.min(delta, 83.34);
-    while (this.accumulator >= GAMEPLAY.fixedStep) {
+    if (!this.paused && !this.winner) this.accumulator += Math.min(delta, 83.34);
+    // Retain jump edges if this render frame contains no simulation tick.
+    if (this.accumulator < GAMEPLAY.fixedStep && !this.paused && !this.winner)
+      this.controls.pending.jumpPressed ||= action.jumpPressed;
+    while (!this.paused && !this.winner && this.accumulator >= GAMEPLAY.fixedStep) {
       this.simTime += GAMEPLAY.fixedStep;
-      const direction = Number(this.keys.D.isDown) - Number(this.keys.A.isDown);
-      this.spider.step(this.simTime, direction, this.web);
-      this.web.beforeStep();
+      this.spider.act(this.simTime, action);
+      this.enemy.act(this.simTime, this.ai.sample(this.simTime));
+      action.jumpPressed = false;
       this.matter.world.step(GAMEPLAY.fixedStep);
+      this.combat.step(this.simTime);
       this.accumulator -= GAMEPLAY.fixedStep;
     }
-    this.spider.draw(delta);
-    const p = this.spider.body.position;
-    const v = this.spider.body.velocity;
-    this.cameraTarget.x = p.x + Phaser.Math.Clamp(v.x * GAMEPLAY.cameraLookAhead, -140, 140);
-    this.cameraTarget.y = p.y - 80 + Phaser.Math.Clamp(v.y * 4, -65, 65);
-    this.web.draw(time);
-    this.drawEffects(time, p, v);
+    for (const spider of this.spiders) { spider.draw(this.paused || this.winner ? 0 : delta); spider.web.draw(); }
+    const p = this.spider.body.position, q = this.enemy.body.position;
+    this.cameraTarget.x = (p.x + q.x) / 2;
+    this.cameraTarget.y = (p.y + q.y) / 2 - CAMERA.verticalOffset;
+    const desired = Phaser.Math.Clamp(Math.min(this.baseZoom,
+      this.scale.width / (Math.abs(p.x - q.x) + CAMERA.paddingX),
+      this.scale.height / (Math.abs(p.y - q.y) + CAMERA.paddingY)), CAMERA.minZoom, CAMERA.maxZoom);
+    const camera = this.cameras.main;
+    camera.setZoom(Phaser.Math.Linear(camera.zoom, desired, 1 - Math.pow(1 - CAMERA.zoomLerp, delta / GAMEPLAY.fixedStep)));
+    this.combat.draw(this.simTime);
+    this.drawEffects(this.simTime);
     this.drawDebug();
+    this.updateHud();
   }
 
-  drawEffects(time, p, v) {
+  drawEffects(time) {
     const river = this.river;
     river.clear().fillStyle(COLORS.magenta, 0.035).fillRect(75, GAMEPLAY.riverY - 30, 2850, 90);
     river.fillStyle(0x501d67, 0.5).fillRect(75, GAMEPLAY.riverY + 2, 2850, 45);
@@ -213,15 +267,20 @@ export default class GameScene extends Phaser.Scene {
     for (let x = 75; x <= 2925; x += 15) wave.push({ x, y: GAMEPLAY.riverY + Math.sin(x * 0.017 + time * 0.002) * 4 });
     river.strokePoints(wave);
     river.lineStyle(1, COLORS.magenta, 0.12).lineBetween(75, GAMEPLAY.riverY + 15, 2925, GAMEPLAY.riverY + 15);
-    if (Math.hypot(v.x, v.y) > 10) this.trail.push({ x: p.x, y: p.y, time });
-    this.trail = this.trail.filter((point) => time - point.time < 250).slice(-18);
     const g = this.effects;
     g.clear();
-    this.trail.forEach((point, i) => {
-      const alpha = (1 - (time - point.time) / 250) * 0.2;
-      g.fillStyle(COLORS.cyan, alpha).fillCircle(point.x, point.y, 2 + i / 12);
-      if (i) g.lineStyle(2, COLORS.cyan, alpha * 0.5).lineBetween(this.trail[i - 1].x, this.trail[i - 1].y, point.x, point.y);
-    });
+    for (const spider of this.spiders) {
+      const p = spider.body.position, v = spider.body.velocity;
+      if (!spider.dead && !this.paused && !this.winner && Math.hypot(v.x, v.y) > 10)
+        spider.trail.push({ x: p.x, y: p.y, time });
+      spider.trail = spider.trail.filter((point) => time - point.time < 250).slice(-18);
+      spider.trail.forEach((point, i) => {
+        const alpha = (1 - (time - point.time) / 250) * 0.2;
+        g.fillStyle(spider.color, alpha).fillCircle(point.x, point.y, 2 + i / 12);
+        if (i) g.lineStyle(2, spider.color, alpha * 0.5)
+          .lineBetween(spider.trail[i - 1].x, spider.trail[i - 1].y, point.x, point.y);
+      });
+    }
   }
 
   drawDebug() {
@@ -241,6 +300,6 @@ export default class GameScene extends Phaser.Scene {
       g.strokeCircle(this.web.anchor.x, this.web.anchor.y, 11);
     }
     document.getElementById('debug-info').textContent =
-      `MATTER / FIXED 60 Hz\nPOS ${p.x.toFixed(0)}, ${p.y.toFixed(0)}\nVEL ${v.x.toFixed(2)}, ${v.y.toFixed(2)}\nSPEED ${Math.hypot(v.x, v.y).toFixed(2)}\nGROUND ${this.spider.grounded}\nROPE ${this.web.constraint?.length.toFixed(1) ?? '—'}`;
+      `MATTER / FIXED 60 Hz · ${this.controls.source}\nPOS ${p.x.toFixed(0)}, ${p.y.toFixed(0)}\nVEL ${v.x.toFixed(2)}, ${v.y.toFixed(2)}\nSPEED ${Math.hypot(v.x, v.y).toFixed(2)}\nGROUND ${this.spider.grounded}\nROPE ${this.web.constraint?.length.toFixed(1) ?? '—'}\nAIM ${this.spider.aim.x.toFixed(2)}, ${this.spider.aim.y.toFixed(2)}\nAI POS ${this.enemy.x.toFixed(0)}, ${this.enemy.y.toFixed(0)}`;
   }
 }

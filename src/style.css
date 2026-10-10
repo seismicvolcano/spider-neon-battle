@@ -3,6 +3,7 @@ html, body { margin: 0; width: 100%; height: 100%; overflow: hidden; background:
 body { font-family: 'Segoe UI', Arial, sans-serif; color: #d3e2ee; }
 #game { width: 100%; height: 100%; }
 canvas { display: block; cursor: crosshair; }
+.gamepad canvas { cursor: none; }
 .hud { position: fixed; inset: 0; pointer-events: none; }
 header { position: absolute; top: 30px; left: 34px; padding: 8px 48px 18px 0; background: linear-gradient(90deg, #070b17dd, transparent); }
 .eyebrow { color: #6e879c; font-size: 10px; letter-spacing: 3px; display: flex; align-items: center; gap: 10px; }
@@ -24,5 +25,22 @@ i { font-style: normal; color: #4a6175; margin: 0 3px; }
 .corner-note { position: absolute; bottom: 13px; left: 51px; font-size: 8px; letter-spacing: 1.8px; color: #486172; }
 .corner-note span { color: #529b91; margin: 0 9px; }
 #debug-info { position: absolute; top: 142px; left: 34px; color: #94e9b4; background: #070b17d9; padding: 12px; font-size: 11px; }
+.scoreboard { position: absolute; top: 28px; left: 50%; transform: translateX(-50%); display: flex; align-items: center; gap: 28px; padding: 13px 22px; background: #080f1ce8; border: 1px solid #29364b; border-radius: 5px; }
+.fighter { display: grid; gap: 5px; text-align: center; min-width: 135px; }
+.fighter b { font: 11px Consolas, monospace; letter-spacing: 2px; }
+.fighter span { font-size: 23px; letter-spacing: 4px; }
+.fighter small { font: 9px Consolas, monospace; color: #a0b2c6; }
+.cyan { color: #5be9e1; } .magenta { color: #e66dff; }
+#score { font: 24px Consolas, monospace; white-space: nowrap; }
+.button-a { color: #9af58f; border-color: #4b8d53; border-radius: 50%; }
+.corner-note b { color: #8caeb8; font-weight: 400; }
+#match-overlay { position: absolute; inset: 0; display: grid; place-items: center; background: #05091899; backdrop-filter: blur(3px); text-align: center; }
+#match-overlay[hidden] { display: none; }
+#match-overlay > div { border: 1px solid #5be9e144; padding: 35px 65px; background: #0b1224ee; box-shadow: 0 0 70px #5be9e111; }
+#match-overlay p { font: 11px Consolas, monospace; color: #8392ad; letter-spacing: 3px; }
+#match-overlay h2 { color: #e4ffff; font-size: 36px; letter-spacing: 3px; }
+#match-overlay span { font: 13px Consolas, monospace; color: #5be9e1; }
+@media (max-width: 1200px) { header h1 { font-size: 15px; } .scoreboard { top: 22px; gap: 12px; padding: 10px; } .fighter { min-width: 105px; } .status { top: 145px; right: 18px; } }
+@media (max-width: 750px) { .scoreboard { top: 110px; width: calc(100% - 36px); justify-content: space-around; } .status { display: none; } .fighter span { font-size: 20px; } .corner-note { max-width: 95%; line-height: 1.4; } #debug-info { top: 220px; } }
 @media (max-width: 850px) { header { top: 16px; left: 18px; } h1 { font-size: 17px; } .status { right: 18px; top: 25px; } footer { bottom: 28px; left: 18px; right: 18px; } .controls, .utilities { gap: 10px; padding: 10px; font-size: 9px; } .corner-note { left: 28px; font-size: 7px; } }
 @media (max-width: 650px) { .status { left: 18px; right: auto; top: 116px; padding: 10px 12px; } footer { flex-wrap: wrap; gap: 6px; } .controls { flex-wrap: wrap; width: 100%; } .utilities { padding: 5px 10px; } .corner-note { font-size: 6px; letter-spacing: 1px; } }

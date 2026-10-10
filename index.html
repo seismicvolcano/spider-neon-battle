@@ -4,23 +4,30 @@
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <meta name="theme-color" content="#070b17" />
-    <title>Spider Neon Battle · Movement Prototype</title>
+    <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' rx='8' fill='%23070b17'/%3E%3Cpath d='M5 8l8 6M5 16h8M5 24l8-6m14-10l-8 6m8 2h-8m8 8l-8-6' stroke='%235be9e1' stroke-width='2'/%3E%3Cellipse cx='16' cy='17' rx='5' ry='7' fill='%235be9e1'/%3E%3C/svg%3E" />
+    <title>Spider Neon Battle · V0.2</title>
   </head>
   <body>
-    <main id="game" aria-label="Spider Neon Battle: prototipo de movimiento"></main>
+    <main id="game" aria-label="Spider Neon Battle: combate arcade"></main>
     <div class="hud">
       <header>
-        <div class="eyebrow"><span></span> LOCOMOTION LAB <b>01</b></div>
+        <div class="eyebrow"><span></span> NEON ARENA <b>02</b></div>
         <h1>SPIDER <strong>NEON</strong> BATTLE</h1>
-        <p>Prototype V0.1 <span>/</span> Caverna Neón</p>
+        <p>V0.2 <span>/</span> FIRST TO 3 WINS</p>
       </header>
+      <section class="scoreboard" aria-label="Marcador" aria-live="polite">
+        <div class="fighter cyan"><b>CYAN</b><span id="cyan-hearts">♥♥♥</span><small id="cyan-weapon">FIND A WEAPON</small></div>
+        <strong id="score">0 — 0</strong>
+        <div class="fighter magenta"><b>MAGENTA</b><span id="magenta-hearts">♥♥♥</span><small id="magenta-weapon">FIND A WEAPON</small></div>
+      </section>
       <aside class="status"><span id="web-led"></span><b id="web-status">WEB: READY</b><small id="web-detail">AIM AT A SOLID SURFACE</small></aside>
       <footer>
-        <div class="controls"><span><kbd>A</kbd><kbd>D</kbd> Move</span><span><kbd>W</kbd><i>/</i><kbd>SPACE</kbd> Jump</span><span><kbd class="mouse">RMB</kbd> Hold to web <i>·</i> Release to let go</span></div>
-        <div class="utilities"><span><kbd>R</kbd> Reset</span><span><kbd>F1</kbd> Debug</span></div>
+        <div class="controls"><span><kbd>LS</kbd> MOVE</span><span><kbd>RS</kbd> AIM</span><span><kbd class="button-a">A</kbd> JUMP</span><span><kbd>LT</kbd> WEB</span><span><kbd>RT</kbd> ATTACK</span></div>
+        <div class="utilities"><span><kbd>MENU</kbd> Pause</span><span><kbd>F1</kbd> Debug</span></div>
       </footer>
-      <div class="corner-note">EXPERIMENTAL PHYSICS <span>●</span> NO FALL DAMAGE</div>
+      <div class="corner-note"><b id="pad-status">PRESS ANY BUTTON · KEYBOARD READY</b><span>●</span> A/D move · W/Space jump · RMB web · LMB attack · Esc pause · R restart</div>
       <pre id="debug-info" hidden></pre>
+      <div id="match-overlay" hidden><div><p>SPIDER NEON BATTLE</p><h2 id="match-title">PAUSED</h2><span id="match-hint">MENU / ESC · RESUME</span></div></div>
     </div>
     <script type="module" src="/src/main.js"></script>
   </body>
