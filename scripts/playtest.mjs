@@ -10,11 +10,13 @@ try {
   page.on('pageerror', (error) => errors.push(error.message));
   page.on('console', (message) => { if (message.type() === 'error') errors.push(message.text()); });
   await page.addInitScript(() => {
-    window.testPad = null;
-    navigator.getGamepads = () => window.testPad ? [window.testPad] : [];
+    window.testPad = null; window.testPad2 = null;
+    navigator.getGamepads = () => [window.testPad, window.testPad2];
   });
   await page.goto(process.env.GAME_URL || 'http://127.0.0.1:5173');
   await page.waitForFunction(() => window.__spiderGame?.scene.getScene('cavern')?.controls);
+  await page.locator('[data-mode=solo]').click();
+  await page.waitForFunction(() => window.__spiderGame.scene.getScene('cavern').countdownRemaining === 0);
   await page.keyboard.down('d');
   await page.waitForFunction(() => window.__spiderGame.scene.getScene('cavern').spider.body.position.x > 350);
   await page.keyboard.up('d');
@@ -23,10 +25,10 @@ try {
     s.game.loop.sleep();
     const { createWeapon } = await import('/src/weaponState.js');
     const { neutralAction } = await import('/src/actions.js');
-    const { COMBAT, GAMEPLAY, CAMERA } = await import('/src/config.js');
+    const { COMBAT, GAMEPLAY, CAMERA, WEB, MATCH, EARTHQUAKE } = await import('/src/config.js');
     const results = [];
     const check = (value, label) => { if (!value) throw new Error(label); results.push(label); };
-    const setPad = (axes = [0, 0, 1, 0], values = {}) => {
+    const setPad = (axes = [0, 0, 0, 0], values = {}) => {
       window.testPad = { id: 'Simulated Xbox', index: 0, connected: true, mapping: 'standard',
         timestamp: performance.now(), axes,
         buttons: Array.from({ length: 17 }, (_, i) => ({ value: values[i] ?? 0,
@@ -37,6 +39,14 @@ try {
       s.matter.body.setPosition(spider.body, { x, y });
       s.matter.body.setVelocity(spider.body, { x: 0, y: 0 });
     };
+    setPad(); s.beginMatch('solo');
+    // Preserve V0.2's nearby AI spawn for its original traversal regression.
+    s.enemy.spawn = { x: 890, y: 1480 };
+    const realRestart = s.restartMatch.bind(s);
+    s.restartMatch = () => {
+      realRestart(); s.countdownRemaining = 0; setPad();
+      s.controls.poll(); s.controls.consumeAll();
+    };
     const realAI = s.ai.sample.bind(s.ai);
     s.ai.sample = () => neutralAction({ x: -1, y: 0 });
     s.restartMatch(); setPad(); tick(5);
@@ -46,10 +56,10 @@ try {
     setPad([0, 0, 0.6, -0.8]); tick();
     setPad([0, 0, 0, 0]); tick();
     check(Math.abs(s.spider.aim.x - 0.6) < 1e-9 && Math.abs(s.spider.aim.y + 0.8) < 1e-9, 'RS keeps last normalized aim');
-    setPad([0, 0, 0, -1], { 0: 1 }); tick();
-    check(s.spider.body.velocity.y < -10, 'A jump uses buffered locomotion');
+    setPad([0, 0, 0, -1], { 5: 1 }); tick();
+    check(s.spider.body.velocity.y < -10, 'RB jump uses buffered locomotion');
     const firstJump = s.spider.jumpQueuedUntil; tick(8);
-    check(s.spider.jumpQueuedUntil === firstJump, 'Holding A does not requeue jump');
+    check(s.spider.jumpQueuedUntil === firstJump, 'Holding RB does not requeue jump');
     setPad([0.7, 0, 0, -1], { 6: 1 }); tick();
     const constraint = s.web.constraint;
     check(!!constraint, 'LT attaches exact surface'); tick(15);
@@ -59,6 +69,7 @@ try {
     s.web.beforeStep();
     check(constraint.stiffness === 0 && constraint.damping === 0, 'Slack rope never pushes');
     s.matter.body.setPosition(s.spider.body, { x: anchor.x, y: anchor.y + constraint.length + 1 });
+    s.matter.body.setVelocity(s.spider.body, { x: 0, y: 1 });
     s.web.beforeStep();
     check(constraint.stiffness === GAMEPLAY.webStiffness, 'Taut rope pulls with original stiffness');
     s.spider.weapon = createWeapon('pistol');
@@ -75,8 +86,8 @@ try {
     setPad([0, 0, 0, -1]); tick(); check(!s.web.attached, 'Releasing LT releases rope');
     setPad([0, 0, 0, -1], { 6: 1 }); tick();
     window.testPad = null; tick();
-    check(!s.web.attached && s.controls.source === 'keyboard' && s.controls.pending.moveX === 0,
-      'Disconnect releases rope and clears held inputs');
+    check(!s.web.attached && s.controls.source === 'disconnected' && s.paused && s.controls.pending.moveX === 0,
+      'Disconnect reserves the seat, pauses and clears held inputs');
 
     s.restartMatch(); setPad(); tick(2);
     bodyAt(s.spider, 360, 1480); bodyAt(s.enemy, 430, 1480);
@@ -154,7 +165,7 @@ try {
       if (!s.winner) tick(Math.ceil(COMBAT.respawnMs / GAMEPLAY.fixedStep) + 2);
     }
     tick();
-    check(s.winner === s.spider && s.spider.score === 3 && document.getElementById('match-title').textContent === 'CYAN WINS',
+    check(s.winner === s.spider && s.spider.score === 3 && document.getElementById('match-title').textContent === 'P1 WINS',
       'Three points end the match and display winner');
     setPad([0, 0, 1, 0], { 0: 1 }); tick();
     check(!s.winner && s.spider.score === 0 && s.enemy.score === 0 && s.enemy.hearts === 3,
@@ -167,7 +178,7 @@ try {
     // Ground/coyote/buffer use the original controller with the new ActionState.
     s.restartMatch(); s.ai.sample = () => neutralAction(); setPad(); tick(5);
     s.spider.lastGrounded = s.simTime; bodyAt(s.spider, 630, 1460);
-    setPad([0, 0, 1, 0], { 0: 1 }); tick();
+    setPad([0, 0, 1, 0], { 5: 1 }); tick();
     check(s.spider.body.velocity.y < -10, 'Coyote jump still works');
     setPad(); tick(); s.spider.lastGrounded = -Infinity;
     bodyAt(s.spider, 320, 1480); s.matter.body.setVelocity(s.spider.body, { x: 0, y: 1 });
@@ -191,11 +202,154 @@ try {
       }
     } finally { Math.random = random; }
     check(webTicks > 0 && combatOccurred, 'One-minute AI simulation traverses ledges, uses web and damages player');
-    s.restartMatch(); setPad(); s.ai.sample = realAI; s.game.loop.wake();
+    // V0.3 real scene / two simulated devices / shared systems.
+    const makePad = (index, axes = [0, 0, 0, 0], values = {}) => ({ id: 'Simulated Xbox ' + index,
+      index, connected: true, mapping: 'standard', axes,
+      buttons: Array.from({ length: 17 }, (_, i) => ({ value: values[i] ?? 0, pressed: (values[i] ?? 0) > 0.5 })) });
+    s.restartMatch = realRestart;
+    s.returnToMenu(); s.modeIndex = 0;
+    window.testPad = makePad(2); window.testPad2 = makePad(7); tick();
+    window.testPad2 = makePad(7, [0, 0, 0, 0], { 13: 1 }); tick(3);
+    check(s.modeIndex === 1, 'Second gamepad navigates modes once per directional press');
+    window.testPad2 = makePad(7); tick();
+    window.testPad = makePad(2, [0, 0, 0, 0], { 0: 1 }); tick();
+    check(s.mode === 'duel' && s.spiders.length === 2 && !s.enemy, 'A confirms P1 vs P2 with no AI');
+    window.testPad = makePad(2); tick();
+    const countdownTime = s.simTime; tick(20);
+    check(s.simTime === countdownTime && s.countdownRemaining > 0, 'Countdown freezes simulation before GO');
+    tick(Math.ceil(MATCH.countdownMs / GAMEPLAY.fixedStep));
+    check(s.countdownRemaining === 0 && s.controls.channels.length === 2, 'Countdown completes with two connected seats');
+    check(s.controls.assignments.seats[0].index === 2 && s.controls.assignments.seats[1].index === 7,
+      'Distinct sparse Gamepad API indices belong to distinct players');
+    bodyAt(s.spider, 320, 1480); bodyAt(s.player2, 890, 1480); tick(12);
+    window.testPad = makePad(2, [0, 0, 0, -1], { 0: 1 }); tick();
+    check(!s.spider.jumpQueuedUntil || s.spider.jumpQueuedUntil < s.simTime, 'A never queues gameplay jump');
+    window.testPad = makePad(2, [0.8, 0, 0, -1], { 5: 1, 6: 1, 7: 1 });
+    window.testPad2 = makePad(7, [-0.8, 0, 1, 0], { 7: 1 });
+    s.spider.weapon = createWeapon('pistol'); s.player2.weapon = createWeapon('pistol'); tick();
+    check(s.spider.body.velocity.y < -10 && s.web.attached && s.spider.weapon.ammo === 9 &&
+      s.player2.weapon.ammo === 9 && s.player2.body.velocity.x < 0,
+      'Two players move/aim/fire independently while P1 holds RB + LT + RT + LS + RS');
+    window.testPad = null; tick();
+    check(s.paused && !s.web.attached && s.controls.channels[0].pending.moveX === 0 &&
+      s.controls.assignments.seats[1].index === 7, 'Disconnect clears one seat without stealing the other device');
+    window.testPad = makePad(2, [1, 0, 0, 0], { 6: 1 }); window.testPad2 = makePad(7); tick();
+    check(!s.controls.channels[0].armed && !s.web.attached, 'Held reconnect controls remain disarmed');
+    window.testPad = makePad(2); tick();
+    window.testPad2 = makePad(7, [0, 0, 0, 0], { 9: 1 }); tick();
+    check(!s.paused, 'P2 can resume after both devices return to neutral');
+    window.testPad2 = makePad(7); tick();
+    window.testPad = makePad(2, [0, 0, 0, 0], { 4: 1 }); tick();
+    check(s.spider.powerCharges === 0 && s.earthquake.warnings.length > 0, 'LB consumes a charge and creates visible warnings');
+    const planned = s.earthquake.warnings.length; tick(10);
+    check(s.spider.powerCharges === 0 && s.earthquake.warnings.length === planned && s.earthquake.rocks.length === 0,
+      'Held LB never retriggers and first rocks wait at least 700 ms');
+    window.testPad = makePad(2); tick(250);
+    check(s.earthquake.rocks.length + s.earthquake.warnings.length <= EARTHQUAKE.maxRocks,
+      'Earthquake concurrency stays within configured capacity');
+    tick(400); check(s.earthquake.rocks.length === 0 && s.earthquake.warnings.length === 0, 'Rocks and warnings expire completely');
+    const powerBefore = s.spider.powerCharges; s.spider.reset(s.simTime);
+    check(s.spider.powerCharges === 1 && s.spider.hearts === 3 && powerBefore === 0, 'Respawn restores exactly one power and three hearts');
+    s.beginMatch('coop'); s.countdownRemaining = 0; tick(); s.ai.sample = () => neutralAction();
+    check(s.spider.team === s.player2.team && s.enemy.team !== s.spider.team, 'Coop lineups have a shared human team');
+    s.player2.invulnerableUntil = 0;
+    check(!s.combat.damage(s.player2, s.spider, { x: 1, y: 0 }, 'pistol', s.simTime), 'Shared combat blocks friendly fire');
+    const injectRock = (owner, targets) => {
+      s.earthquake.reset();
+      targets.forEach((target) => { bodyAt(target, 1100, 1200); target.invulnerableUntil = 0; });
+      s.earthquake.rocks.push({ owner, x: 1100, y: 1172, speed: 0, expires: s.simTime + 1000, hit: new Set() });
+      s.earthquake.step(s.simTime);
+    };
+    injectRock(s.spider, [s.spider, s.player2, s.enemy]);
+    check(s.spider.hearts === 3 && s.player2.hearts === 3 && s.enemy.hearts === 2,
+      'Actual rocks spare executor and coop ally but damage rival');
+    s.enemy.invulnerableUntil = 0; s.earthquake.step(s.simTime);
+    check(s.enemy.hearts === 2, 'Same physical rock never damages the same target twice');
+    for (let point = 0; point < COMBAT.scoreToWin; point++) {
+      const owner = point === 1 ? s.player2 : s.spider;
+      s.enemy.hearts = 1; s.enemy.dead = false; s.enemy.invulnerableUntil = 0;
+      s.combat.damage(s.enemy, owner, { x: 1, y: 0 }, 'rock', s.simTime);
+      if (!s.winner) s.enemy.reset(s.simTime);
+    }
+    tick();
+    check(s.winner?.team === 'players' && s.spider.score === 2 && s.player2.score === 1 &&
+      document.getElementById('match-title').textContent === 'P1 + P2 WIN', 'Coop combines attributed points into a shared three-point victory');
+    window.testPad2 = makePad(7, [0, 0, 0, 0], { 0: 1 }); tick();
+    check(!s.winner && s.spider.score === 0 && s.player2.score === 0 && s.mode === 'coop' && s.countdownRemaining > 0,
+      'P2 A starts immediate coop rematch with fresh countdown');
+    window.testPad2 = makePad(7); tick();
+    s.beginMatch('ffa'); s.countdownRemaining = 0; tick(); s.ai.sample = () => neutralAction();
+    injectRock(s.spider, [s.spider, s.player2, s.enemy]);
+    check(s.spider.hearts === 3 && s.player2.hearts === 2 && s.enemy.hearts === 2,
+      'FFA rocks can hit both rivals but never their executor');
+    WEB.aimIndicatorMode = 'off'; s.web.draw();
+    check(s.web.aim.commandBuffer.length === 0, 'Off mode removes all aim graphics');
+    bodyAt(s.spider, 350, 1480); bodyAt(s.player2, 500, 1480); bodyAt(s.enemy, 2270, 1480);
+    s.player2.invulnerableUntil = 0; s.spider.weapon = createWeapon('pistol');
+    window.testPad = makePad(2, [0, 0, 1, 0], { 7: 1 }); tick(); window.testPad = makePad(2); tick(12);
+    check(s.player2.hearts === 1, 'Hidden aim leaves RS shooting and hit detection intact');
+    WEB.aimIndicatorMode = 'minimal'; s.audio.setMute(true);
+    for (const name of ['earthquake', 'jump', 'pistol', 'rockHit']) s.audio.play(name);
+    tick(); check(s.audio.mute, 'Muted scene continues simulating without audio errors'); s.audio.setMute(false);
+    s.keys.F1.emit('down', { repeat: false }); tick();
+    check(document.getElementById('debug-info').textContent.includes('MATTER'), 'Debug works with three fighters');
+    s.keys.F1.emit('down', { repeat: false });
+    window.testPad2 = null; window.testPad = makePad(2);
+    s.deviceLayout = 'mixed'; s.beginMatch('coop'); s.countdownRemaining = 0; tick();
+    check(s.controls.channels[0].source === 'gamepad' && s.controls.channels[1].source === 'keyboard',
+      'Mixed mode gives P1 the pad and P2 exclusive keyboard/mouse');
+    s.ai.sample = () => neutralAction(); s.keys.D.isDown = true; tick(10); s.keys.D.isDown = false;
+    check(s.player2.body.velocity.x > 3 && Math.abs(s.spider.body.velocity.x) < 1,
+      'Keyboard movement changes only P2 in mixed mode');
+    s.returnToMenu(); s.game.loop.wake();
     return results;
   });
+  await page.selectOption('#device-layout', 'mixed');
+  await page.locator('[data-mode=coop]').click();
+  await page.waitForFunction(() => {
+    const s = window.__spiderGame.scene.getScene('cavern');
+    return s.countdownRemaining === 0 && s.player2.grounded;
+  });
+  const cursor = await page.evaluate(async () => {
+    const s = window.__spiderGame.scene.getScene('cavern');
+    const { createWeapon } = await import('/src/weaponState.js');
+    const { neutralAction } = await import('/src/actions.js');
+    s.ai.sample = () => neutralAction(); s.player2.weapon = createWeapon('pistol');
+    const c = s.cameras.main, p = s.player2.body.position;
+    return { x: (p.x - c.worldView.x) * c.zoom, y: (p.y - 250 - c.worldView.y) * c.zoom };
+  });
+  await page.mouse.move(cursor.x, cursor.y);
+  await page.mouse.down({ button: 'right' });
+  await page.waitForFunction(() => window.__spiderGame.scene.getScene('cavern').player2.web.attached);
+  await page.mouse.down({ button: 'left' });
+  await page.keyboard.down('d'); await page.keyboard.press('w');
+  await page.waitForFunction(() => {
+    const s = window.__spiderGame.scene.getScene('cavern');
+    return s.player2.weapon?.ammo < 10 && s.player2.body.velocity.y < -7 && s.spider.weapon === null;
+  });
+  await page.keyboard.up('d'); await page.mouse.up({ button: 'left' }); await page.mouse.up({ button: 'right' });
+  await page.waitForFunction(() => !window.__spiderGame.scene.getScene('cavern').player2.web.attached);
+  results.push('Real P2 keyboard + mouse jumps, swings, aims and shoots independently from P1 pad');
+  await page.keyboard.down('d');
+  await page.keyboard.press('Escape');
+  await page.waitForFunction(() => window.__spiderGame.scene.getScene('cavern').paused);
+  const pausedState = await page.evaluate(() => {
+    const s = window.__spiderGame.scene.getScene('cavern');
+    return { time: s.simTime, audio: s.audio.context?.state, voices: s.audio.voices.size };
+  });
+  assert.equal(pausedState.audio, 'running'); assert.equal(pausedState.voices, 0);
+  assert.equal(await page.evaluate(() => window.__spiderGame.scene.getScene('cavern').controls.channels[1].armed), false);
+  await page.keyboard.up('d');
+  await page.waitForFunction(() => window.__spiderGame.scene.getScene('cavern').controls.channels[1].armed);
+  assert.equal(await page.evaluate(() => window.__spiderGame.scene.getScene('cavern').simTime), pausedState.time);
+  results.push('Pause preserves simulation time and blocks a held keyboard until physical release');
+  results.push('User interaction resumes real AudioContext; pause silences active effects');
+  await page.screenshot({ path: '.playtest/v03-coop.png' });
+  await page.evaluate(() => { window.testPad.buttons[0] = { value: 1, pressed: true }; });
+  await page.waitForFunction(() => !document.querySelector('#main-menu').hidden);
+  results.push('Gamepad A returns from pause to mode selection');
   results.forEach((result) => console.log(`PASS ${result}`));
-  const screenshotPath = process.env.SCREENSHOT_PATH || '.playtest/v02-validated.png';
+  const screenshotPath = process.env.SCREENSHOT_PATH || '.playtest/v03-validated.png';
   await mkdir(dirname(screenshotPath), { recursive: true });
   await page.screenshot({ path: screenshotPath });
   assert.deepEqual(errors, [], 'Browser console should have no errors');

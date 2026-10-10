@@ -5,29 +5,42 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <meta name="theme-color" content="#070b17" />
     <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' rx='8' fill='%23070b17'/%3E%3Cpath d='M5 8l8 6M5 16h8M5 24l8-6m14-10l-8 6m8 2h-8m8 8l-8-6' stroke='%235be9e1' stroke-width='2'/%3E%3Cellipse cx='16' cy='17' rx='5' ry='7' fill='%235be9e1'/%3E%3C/svg%3E" />
-    <title>Spider Neon Battle · V0.2</title>
+    <title>Spider Neon Battle · V0.3</title>
   </head>
   <body>
     <main id="game" aria-label="Spider Neon Battle: combate arcade"></main>
     <div class="hud">
       <header>
-        <div class="eyebrow"><span></span> NEON ARENA <b>02</b></div>
+        <div class="eyebrow"><span></span> NEON ARENA <b>03</b></div>
         <h1>SPIDER <strong>NEON</strong> BATTLE</h1>
-        <p>V0.2 <span>/</span> FIRST TO 3 WINS</p>
+        <p>V0.3 <span>/</span> <b id="mode-label">LOCAL MULTIPLAYER</b></p>
       </header>
       <section class="scoreboard" aria-label="Marcador" aria-live="polite">
-        <div class="fighter cyan"><b>CYAN</b><span id="cyan-hearts">♥♥♥</span><small id="cyan-weapon">FIND A WEAPON</small></div>
-        <strong id="score">0 — 0</strong>
-        <div class="fighter magenta"><b>MAGENTA</b><span id="magenta-hearts">♥♥♥</span><small id="magenta-weapon">FIND A WEAPON</small></div>
+        <div id="fighters"></div>
+        <strong id="score">FIRST TO 3</strong>
       </section>
       <aside class="status"><span id="web-led"></span><b id="web-status">WEB: READY</b><small id="web-detail">AIM AT A SOLID SURFACE</small></aside>
       <footer>
-        <div class="controls"><span><kbd>LS</kbd> MOVE</span><span><kbd>RS</kbd> AIM</span><span><kbd class="button-a">A</kbd> JUMP</span><span><kbd>LT</kbd> WEB</span><span><kbd>RT</kbd> ATTACK</span></div>
+        <div class="controls"><span><kbd>LS</kbd> MOVE</span><span><kbd>RS</kbd> AIM</span><span><kbd>RB</kbd> JUMP</span><span><kbd>LT</kbd> WEB</span><span><kbd>RT</kbd> ATTACK</span><span><kbd>LB</kbd> QUAKE</span></div>
         <div class="utilities"><span><kbd>MENU</kbd> Pause</span><span><kbd>F1</kbd> Debug</span></div>
       </footer>
-      <div class="corner-note"><b id="pad-status">PRESS ANY BUTTON · KEYBOARD READY</b><span>●</span> A/D move · W/Space jump · RMB web · LMB attack · Esc pause · R restart</div>
+      <div class="corner-note"><b id="pad-status">PRESS ANY BUTTON · KEYBOARD READY</b><span>●</span> A/D move · W/Space jump · RMB web · LMB attack · Q quake · Esc pause · Enter/R rematch · M mute</div>
       <pre id="debug-info" hidden></pre>
-      <div id="match-overlay" hidden><div><p>SPIDER NEON BATTLE</p><h2 id="match-title">PAUSED</h2><span id="match-hint">MENU / ESC · RESUME</span></div></div>
+      <div id="offscreen"></div><div id="countdown" hidden>3</div>
+      <div id="match-overlay" hidden><div><p>SPIDER NEON BATTLE</p><h2 id="match-title">PAUSED</h2><span id="match-hint">MENU / ESC · RESUME</span><div class="overlay-actions"><button id="play-again">REMATCH</button><button id="menu-back">MAIN MENU</button></div></div></div>
+      <div id="main-menu"><div class="menu-panel">
+        <p class="eyebrow">LOCAL MULTIPLAYER / V0.3</p><h2>NEON <strong>EARTHQUAKE</strong></h2>
+        <p class="menu-description">Swing together. Strike your rivals. Shake the cavern.</p>
+        <div id="mode-options" aria-label="Game modes"></div>
+        <div class="settings">
+          <label>Devices <select id="device-layout"><option value="auto">Auto: 2 pads / pad + keyboard</option><option value="pads">Two gamepads</option><option value="mixed">P1 gamepad + P2 keyboard/mouse</option></select></label>
+          <label>AI <select id="ai-difficulty"><option value="easy">Easy</option><option value="normal">Normal</option></select></label>
+          <label>Aim line <select id="aim-mode"><option value="minimal">Minimal</option><option value="off">Off</option></select></label>
+          <label>Volume <input id="volume" type="range" min="0" max="1" step="0.05" aria-label="Master volume"></label>
+        </div>
+        <button id="mute">SOUND ON · M</button>
+        <p class="menu-help">LS / D-pad ↑↓ mode · ←→ devices · A confirm<br>Keyboard: arrows + Enter · Connect pads and press any button<br>RB jump · LT web · RT attack · LB earthquake · Menu pause</p>
+      </div></div>
     </div>
     <script type="module" src="/src/main.js"></script>
   </body>

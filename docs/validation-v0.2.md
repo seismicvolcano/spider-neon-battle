@@ -1,5 +1,7 @@
 # Validación V0.2
 
+Registro histórico de V0.2. Los controles actuales usan RB para saltar y LB para el terremoto; consulta [validación V0.3](validation-v0.3.md).
+
 Validado el 6 de octubre de 2026 en Windows, Chrome, Phaser 3.90.0, Vite 6.4.4 y Node 24.19.0, sobre `codex/v0.2-gamepad-combat` creada desde `origin/main` (`974af36`).
 
 ## Resultado
