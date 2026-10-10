@@ -21,7 +21,7 @@ test('aim is normalized regardless of stick magnitude and retains last valid dir
 });
 test('Xbox buttons have independent edges and LT/RT/LS/RS work together', () => {
   const mapper = new GamepadActions();
-  const held = pad([1, -1, 0.6, -0.8], { 0: 1, 6: 0.8, 7: 1, 9: 1 });
+  const held = pad([1, -1, 0.6, -0.8], { 5: 1, 6: 0.8, 7: 1, 9: 1 });
   const action = mapper.sample(held);
   assert.equal(action.moveX, 1); assert.equal(action.jumpPressed, true);
   assert.equal(action.pausePressed, true); assert.equal(action.webHeld, true);
@@ -37,10 +37,29 @@ test('Xbox buttons have independent edges and LT/RT/LS/RS work together', () => 
 });
 test('disconnect clears all held inputs and reconnect can jump again', () => {
   const mapper = new GamepadActions();
-  mapper.sample(pad([1, 0, 1, 0], { 0: 1, 6: 1, 7: 1 }));
+  mapper.sample(pad([1, 0, 1, 0], { 5: 1, 6: 1, 7: 1 }));
   const action = mapper.sample(null);
   assert.equal(action.moveX, 0); assert.equal(action.webHeld, false);
   assert.equal(action.attackHeld, false); assert.equal(action.jumpPressed, false);
   assert.equal(action.aimX, 1);
-  assert.equal(mapper.sample(pad([], { 0: 1 })).jumpPressed, true);
+  assert.equal(mapper.sample(pad([], { 5: 1 })).jumpPressed, true);
+});
+
+test('RB jumps, A only confirms, LB powers and never attacks', () => {
+  const mapper = new GamepadActions();
+  const a = mapper.sample(pad([], { 0: 1, 4: 1 }));
+  assert.equal(a.jumpPressed, false); assert.equal(a.confirmPressed, true);
+  assert.equal(a.powerPressed, true); assert.equal(a.attackHeld, false);
+  assert.equal(mapper.sample(pad([], { 4: 1 })).powerPressed, false);
+  assert.equal(mapper.sample(pad([], { 5: 1 })).jumpPressed, true);
+});
+
+test('two gamepad mappers retain independent aims and edges', () => {
+  const p1 = new GamepadActions(), p2 = new GamepadActions();
+  const a = p1.sample(pad([1, 0, 1, 0], { 5: 1, 6: 1, 7: 1 }));
+  const b = p2.sample(pad([-1, 0, 0, -1], { 4: 1 }));
+  assert.equal(a.jumpPressed, true); assert.equal(b.jumpPressed, false);
+  assert.equal(a.attackHeld, true); assert.equal(b.attackHeld, false);
+  assert.equal(b.powerPressed, true); assert.equal(a.powerPressed, false);
+  assert.equal(p1.sample(pad()).aimX, 1); assert.equal(p2.sample(pad()).aimY, -1);
 });

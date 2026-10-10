@@ -36,8 +36,18 @@ export const COLORS = {
 export const INPUT = {
   moveDeadzone: 0.2, aimDeadzone: 0.23, triggerThreshold: 0.4,
   initialAim: { x: 0.6, y: -0.8 },
+  buttons: { confirm: 0, power: 4, jump: 5, web: 6, attack: 7, pause: 9, up: 12, down: 13, left: 14, right: 15 },
+  devices: { layout: 'auto' },
+  menuDeadzone: 0.6,
 };
-export const WEB = { assistAngleDeg: 10, assistSteps: 4, indicatorLength: 92 };
+export const WEB = { assistAngleDeg: 10, assistSteps: 4, aimIndicatorMode: 'minimal',
+  indicatorLength: 28, indicatorOffset: 30, indicatorAlpha: 0.28 };
+export const MATCH = { countdownMs: 3000, goMs: 450, friendlyFire: false };
+export const AUDIO = { volume: 0.35, mute: false, maxVoices: 10, minIntervalMs: 55 };
+export const EARTHQUAKE = { chargesPerRespawn: 1, rockCount: 8, maxRocks: 24,
+  warningMs: 700, durationMs: 2500, spread: 380, safeDropHeight: 140,
+  lifetimeMs: 3200, radius: 18, fallSpeed: 480, acceleration: 850,
+  damage: 1, knockback: 9, upwardKick: 4, shakeMs: 280, shakeIntensity: 0.003 };
 export const COMBAT = {
   hearts: 3, invulnerabilityMs: 900, spawnInvulnerabilityMs: 1200,
   respawnMs: 1100, scoreToWin: 3, pickupRadius: 39, weaponRespawnMs: 6500,
@@ -53,12 +63,16 @@ export const COMBAT = {
   ],
 };
 export const FIGHTERS = {
-  player: { id: 'cyan', spawn: { ...GAMEPLAY.spawn }, color: COLORS.cyan, accentColor: 0xadfff2 },
-  enemy: { id: 'magenta', spawn: { x: 890, y: 1480 }, color: COLORS.magenta, accentColor: 0xf7c1ff },
+  player: { id: 'cyan', name: 'P1', spawn: { ...GAMEPLAY.spawn }, color: COLORS.cyan, accentColor: 0xadfff2 },
+  player2: { id: 'magenta', name: 'P2', spawn: { x: 890, y: 1480 }, color: COLORS.magenta, accentColor: 0xf7c1ff },
+  enemy: { id: 'orange', name: 'AI', spawn: { x: 2270, y: 1480 }, color: 0xffb454, accentColor: 0xffe6a0 },
 };
 export const CAMERA = { minZoom: 0.48, maxZoom: 1.15, paddingX: 360, paddingY: 400,
-  zoomLerp: 0.025, verticalOffset: 65 };
+  zoomLerp: 0.025, verticalOffset: 65, edgeMargin: 32 };
 export const AI = {
+  difficulty: 'easy', levels: { easy: { reaction: 1, accuracy: 1, fire: 1 },
+    normal: { reaction: 0.65, accuracy: 0.65, fire: 0.75 } },
+  powerFirstMs: 8500, powerIntervalMs: 12000, powerChance: 0.3,
   reactionMs: 280, aimErrorRad: 0.12, moveStrength: 0.85, stopDistance: 65,
   jumpCooldownMs: 850, higherTarget: 65, obstacleProbe: 62,
   ledgeProbeDepth: 90, edgeClearance: 85,

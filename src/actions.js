@@ -13,23 +13,33 @@ export function aimDirection(x, y, last = INPUT.initialAim, threshold = INPUT.ai
 
 export function neutralAction(aim = INPUT.initialAim) {
   return { moveX: 0, aimX: aim.x, aimY: aim.y, jumpPressed: false,
-    webHeld: false, attackHeld: false, pausePressed: false, resetPressed: false };
+    webHeld: false, attackHeld: false, powerPressed: false, pausePressed: false,
+    confirmPressed: false, resetPressed: false, menuX: 0, menuY: 0 };
 }
 
-// Standard Gamepad API indices: A=0, LT=6, RT=7, Menu=9, RS axes=2/3.
+// Standard Xbox mapping is centralized in config. One mapper per device/seat.
 export class GamepadActions {
   constructor() { this.reset(); this.aim = { ...INPUT.initialAim }; }
-  reset() { this.previousJump = false; this.previousPause = false; }
+  reset() { this.previous = {}; }
   sample(pad) {
     if (!pad?.connected) { this.reset(); return neutralAction(this.aim); }
     const button = (index) => pad.buttons[index]?.value ?? 0;
     this.aim = aimDirection(pad.axes[2] ?? 0, pad.axes[3] ?? 0, this.aim);
-    const jump = button(0) > 0.5;
-    const pause = button(9) > 0.5;
+    const b = INPUT.buttons;
+    const edge = (name) => {
+      const held = button(b[name]) > 0.5, pressed = held && !this.previous[name];
+      this.previous[name] = held; return pressed;
+    };
+    const menuX = Math.sign((button(b.right) - button(b.left)) ||
+      (Math.abs(pad.axes[0]) > INPUT.menuDeadzone ? pad.axes[0] : 0));
+    const menuY = Math.sign((button(b.down) - button(b.up)) ||
+      (Math.abs(pad.axes[1]) > INPUT.menuDeadzone ? pad.axes[1] : 0));
     const action = { ...neutralAction(this.aim), moveX: deadzone(pad.axes[0] ?? 0),
-      jumpPressed: jump && !this.previousJump, pausePressed: pause && !this.previousPause,
-      webHeld: button(6) > INPUT.triggerThreshold, attackHeld: button(7) > INPUT.triggerThreshold };
-    this.previousJump = jump; this.previousPause = pause;
+      jumpPressed: edge('jump'), powerPressed: edge('power'), confirmPressed: edge('confirm'),
+      pausePressed: edge('pause'), menuX: menuX !== this.previous.menuX ? menuX : 0,
+      menuY: menuY !== this.previous.menuY ? menuY : 0,
+      webHeld: button(b.web) > INPUT.triggerThreshold, attackHeld: button(b.attack) > INPUT.triggerThreshold };
+    this.previous.menuX = menuX; this.previous.menuY = menuY;
     return action;
   }
 }

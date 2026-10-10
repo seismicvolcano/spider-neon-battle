@@ -1,6 +1,7 @@
 import { AI, COMBAT } from './config.js';
 import { neutralAction, aimDirection } from './actions.js';
 import { raycast } from './raycast.js';
+import { opponents } from './matchRules.js';
 
 export default class EnemyAI {
   constructor(scene, spider, target) {
@@ -8,15 +9,19 @@ export default class EnemyAI {
     this.reset();
   }
   reset() {
-    this.nextThink = this.nextJump = this.nextShot = 0;
+    this.nextThink = this.nextJump = this.nextShot = 0; this.nextPower = AI.powerFirstMs;
     this.nextWeb = AI.webIntervalMs; this.webUntil = 0;
-    this.goal = { ...this.target.body.position }; this.aim = { x: -1, y: 0 };
+    this.goal = { ...(this.target?.body.position ?? this.spider.body.position) }; this.aim = { x: -1, y: 0 };
   }
   sample(time) {
     const spider = this.spider, p = spider.body.position;
-    if (spider.dead || this.target.dead) return neutralAction(this.aim);
+    const rivals = this.scene.spiders.filter((s) => !s.dead && opponents(spider, s, false));
+    this.target = rivals.sort((a, b) => Math.hypot(a.body.position.x - p.x, a.body.position.y - p.y) -
+      Math.hypot(b.body.position.x - p.x, b.body.position.y - p.y))[0];
+    if (spider.dead || !this.target) return neutralAction(this.aim);
+    const difficulty = AI.levels[AI.difficulty] ?? AI.levels.easy;
     if (time >= this.nextThink) {
-      this.nextThink = time + AI.reactionMs;
+      this.nextThink = time + AI.reactionMs * difficulty.reaction;
       const target = this.target.body.position;
       this.goal = { ...target };
       if (!spider.weapon) {
@@ -35,7 +40,7 @@ export default class EnemyAI {
         const rightBlocked = raycast(this.scene.solids, p, { x: right, y: p.y });
         this.goal.x = !leftBlocked && (rightBlocked || Math.abs(p.x - left) < Math.abs(p.x - right)) ? left : right;
       }
-      const error = (Math.random() * 2 - 1) * AI.aimErrorRad;
+      const error = (Math.random() * 2 - 1) * AI.aimErrorRad * difficulty.accuracy;
       const angle = Math.atan2(target.y - p.y, target.x - p.x) + error;
       this.aim = { x: Math.cos(angle), y: Math.sin(angle) };
     }
@@ -66,7 +71,11 @@ export default class EnemyAI {
     const visible = !raycast(this.scene.solids, p, target);
     if (spider.weapon?.type === 'sword') action.attackHeld = visible && distance < AI.swordRange;
     if (spider.weapon?.type === 'pistol' && visible && distance < AI.attackRange && time >= this.nextShot && !action.webHeld) {
-      action.attackHeld = true; this.nextShot = time + AI.pistolFireMs;
+      action.attackHeld = true; this.nextShot = time + AI.pistolFireMs * difficulty.fire;
+    }
+    if (time >= this.nextPower) {
+      this.nextPower = time + AI.powerIntervalMs;
+      action.powerPressed = spider.powerCharges > 0 && Math.random() < AI.powerChance;
     }
     return action;
   }

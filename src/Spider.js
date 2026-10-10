@@ -1,13 +1,14 @@
-import { GAMEPLAY, COLORS, COMBAT } from './config.js';
+import { GAMEPLAY, COLORS, COMBAT, EARTHQUAKE, INPUT } from './config.js';
 import { raycast } from './raycast.js';
 
 export default class Spider {
-  constructor(scene, { id, spawn, color, accentColor }) {
+  constructor(scene, { id, name = id, team = id, spawn, color, accentColor }) {
     this.scene = scene;
     this.id = id; this.spawn = { ...spawn }; this.color = color; this.accentColor = accentColor;
+    this.name = name; this.team = team; this.powerCharges = EARTHQUAKE.chargesPerRespawn;
     this.hearts = COMBAT.hearts; this.score = 0; this.dead = false;
     this.invulnerableUntil = 0; this.respawnAt = 0; this.weapon = null;
-    this.aim = { x: 0.6, y: -0.8 }; this.webHeld = false; this.trail = [];
+    this.aim = { ...INPUT.initialAim }; this.webHeld = false; this.trail = [];
     this.body = scene.matter.add.circle(spawn.x, spawn.y, GAMEPLAY.radius, {
       label: `spider-${id}`, friction: 0, frictionStatic: 0, frictionAir: GAMEPLAY.airDrag,
       restitution: 0, density: 0.003,
@@ -35,6 +36,7 @@ export default class Spider {
     this.step(time, action.moveX, this.web);
     this.web.beforeStep();
     if (action.attackHeld) this.scene.combat.attack(this, time);
+    if (action.powerPressed) this.scene.earthquake.activate(this, time);
   }
 
   checkGround() {
@@ -79,6 +81,7 @@ export default class Spider {
       this.lastGrounded = -Infinity;
       this.grounded = false;
       this.scene.pulse(this.body.position.x, this.body.position.y + 17, this.color);
+      this.scene.audio?.play('jump');
     }
     const speed = Math.hypot(this.body.velocity.x, this.body.velocity.y);
     if (speed > GAMEPLAY.maxSwingSpeed) {
@@ -90,6 +93,7 @@ export default class Spider {
       Body.setVelocity(this.body, { x: this.body.velocity.x, y: -GAMEPLAY.riverBounceSpeed });
       this.riverCooldown = time + 500;
       this.scene.pulse(this.body.position.x, GAMEPLAY.riverY, COLORS.magenta, 95);
+      this.scene.audio?.play('river');
     }
   }
 
@@ -107,6 +111,7 @@ export default class Spider {
     this.web.release();
     this.webHeld = false; this.dead = false; this.body.isSensor = false;
     this.hearts = COMBAT.hearts; this.weapon = null;
+    this.powerCharges = EARTHQUAKE.chargesPerRespawn;
     this.invulnerableUntil = time + COMBAT.spawnInvulnerabilityMs;
     this.scene.matter.body.setStatic(this.body, false);
     this.scene.matter.body.setInertia(this.body, Infinity);
@@ -116,6 +121,11 @@ export default class Spider {
     this.lastGrounded = this.jumpQueuedUntil = -Infinity;
     this.riverCooldown = 0;
     this.grounded = false; this.trail.length = 0;
+  }
+
+  destroy() {
+    this.web.release(); this.web.rope.destroy(); this.web.aim.destroy();
+    this.graphics.destroy(); this.scene.matter.world.remove(this.body);
   }
 
   draw(delta) {

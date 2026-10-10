@@ -17,7 +17,7 @@ const game = new Phaser.Game({
   scene: [GameScene],
   callbacks: { postBoot: (game) => {
     game.canvas.setAttribute('tabindex', '0');
-    game.canvas.setAttribute('aria-label', 'Spider Neon Battle. LS mover, RS apuntar, A saltar, LT telaraña, RT atacar.');
+    game.canvas.setAttribute('aria-label', 'Spider Neon Battle. LS mover, RS apuntar, RB saltar, LT telaraña, RT atacar, LB terremoto. A confirmar, Menu pausa.');
   } },
 });
 

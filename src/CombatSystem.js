@@ -1,4 +1,5 @@
-import { COMBAT, GAMEPLAY } from './config.js';
+import { COMBAT, GAMEPLAY, EARTHQUAKE } from './config.js';
+import { opponents, awardPoint } from './matchRules.js';
 import { raycast } from './raycast.js';
 import { createWeapon, useWeapon, canDamage } from './weaponState.js';
 
@@ -14,6 +15,7 @@ export default class CombatSystem {
   }
   attack(spider, time) {
     if (!useWeapon(spider.weapon, time)) return;
+    this.scene.audio?.play(spider.weapon.type === 'sword' ? 'sword' : 'pistol');
     const p = spider.body.position, aim = { ...spider.aim };
     if (spider.weapon.type === 'sword') {
       this.swings.push({ owner: spider, start: time, end: time + COMBAT.sword.durationMs,
@@ -35,11 +37,13 @@ export default class CombatSystem {
     }
   }
   damage(target, attacker, direction, type, time) {
-    if (!canDamage(target, time) || this.scene.winner) return false;
-    const settings = COMBAT[type], v = target.body.velocity;
+    if (!canDamage(target, time) || this.scene.winner || !opponents(attacker, target)) return false;
+    const settings = type === 'rock' ? EARTHQUAKE : COMBAT[type], v = target.body.velocity;
     const relative = Math.hypot(attacker.body.velocity.x - v.x, attacker.body.velocity.y - v.y);
     const strength = settings.knockback + (type === 'sword' ? Math.min(5, relative * settings.momentumFactor) : 0);
-    target.hearts--;
+    target.hearts = Math.max(0, target.hearts - (settings.damage ?? 1));
+    this.scene.audio?.play(type === 'sword' ? 'swordHit' : type === 'pistol' ? 'shotHit' : 'rockHit');
+    this.scene.audio?.play('damage');
     target.invulnerableUntil = time + COMBAT.invulnerabilityMs;
     this.scene.matter.body.setVelocity(target.body, {
       x: v.x + direction.x * strength, y: v.y + direction.y * strength - settings.upwardKick,
@@ -51,10 +55,11 @@ export default class CombatSystem {
       target.jumpQueuedUntil = -Infinity; target.respawnAt = time + COMBAT.respawnMs;
       target.body.isSensor = true;
       this.scene.matter.body.setStatic(target.body, true);
-      attacker.score++;
+      this.scene.audio?.play('death');
+      const winner = awardPoint(attacker, this.scene.spiders, this.scene.mode);
       this.burst(target.body.position.x, target.body.position.y, target.color, time, 32);
       this.scene.pulse(target.body.position.x, target.body.position.y, target.color, 110);
-      if (attacker.score >= COMBAT.scoreToWin) this.scene.finishMatch(attacker);
+      if (winner) this.scene.finishMatch(winner);
     }
     return true;
   }
@@ -68,6 +73,7 @@ export default class CombatSystem {
         if (time < pickup.availableAt || Math.hypot(p.x - pickup.x, p.y - pickup.y) > COMBAT.pickupRadius) continue;
         if (raycast(this.scene.solids, p, pickup)) continue;
         spider.weapon = createWeapon(pickup.type);
+        this.scene.audio?.play('pickup');
         pickup.availableAt = time + COMBAT.weaponRespawnMs;
         this.scene.pulse(pickup.x, pickup.y, spider.color);
         break;
@@ -77,7 +83,7 @@ export default class CombatSystem {
       if (swing.owner.dead || time > swing.end) continue;
       const p = swing.owner.body.position;
       for (const target of spiders) {
-        if (target === swing.owner || target.dead || swing.hit.has(target.id)) continue;
+        if (!opponents(swing.owner, target) || target.dead || swing.hit.has(target.id)) continue;
         const q = target.body.position, dx = q.x - p.x, dy = q.y - p.y;
         const distance = Math.hypot(dx, dy);
         const dot = (dx * swing.aim.x + dy * swing.aim.y) / Math.max(1, distance);
@@ -93,7 +99,7 @@ export default class CombatSystem {
       const start = { x: shot.x, y: shot.y };
       const step = COMBAT.pistol.speed * GAMEPLAY.fixedStep / 1000;
       const end = { x: shot.x + shot.aim.x * step, y: shot.y + shot.aim.y * step };
-      const targets = spiders.filter((s) => s !== shot.owner && !s.dead);
+      const targets = spiders.filter((s) => opponents(shot.owner, s) && !s.dead);
       const hit = raycast([...this.scene.solids, ...targets.map((s) => s.body)], start, end);
       if (hit) {
         const target = targets.find((s) => s.body === hit.body);
